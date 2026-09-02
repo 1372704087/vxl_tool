@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{2A3B4C5D-6E7F-4A8B-9C1D-0E1F2A3B4C5D}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx</Extensions>
+    </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{3A4B5C6D-7E8F-4A9B-8C1D-0E1F2A3B4C5D}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VxlEncoder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VxlDecoder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VxlNormals.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\generators.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\HvaEncoder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\HvaDecoder.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PngWriter.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VoxelRenderer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ObjLoader.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Voxelizer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\generators.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HvaDecoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\HvaEncoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ObjLoader.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PngWriter.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Voxelizer.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VoxelRenderer.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VxlDecoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VxlEncoder.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VxlNormals.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VxlTypes.h">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

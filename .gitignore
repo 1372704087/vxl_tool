@@ -1,0 +1,13 @@
+# 构建产物
+out/
+
+# Visual Studio 缓存与用户配置
+.vs/
+*.user
+
+# 编译器产物
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tlog/
