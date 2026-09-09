@@ -1,12 +1,23 @@
 #include <ObjLoader.h>
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <locale>
 #include <sstream>
 
 namespace
 {
+	// [修复 C8] 生成一个"始终使用经典的 'C' locale、忽略全局 locale"的字符串流，
+	//   保证小数点固定为 '.'，不受 de_DE 等逗号小数点 locale 影响（替代 std::sscanf("%f")）。
+	inline std::istringstream LocaleFreeStream(const std::string& s)
+	{
+		std::istringstream ss(s);
+		ss.imbue(std::locale::classic());
+		return ss;
+	}
 	// 把 "1/2/3"、"1//3"、"1" 解析为顶点索引（1 基），返回 0 基索引
 	int ParseVertexIndex(const std::string& tok)
 	{
@@ -27,8 +38,10 @@ namespace
 	// 要求确有 6 个浮点数，否则视为无顶点色。
 	bool ParseColor(const std::string& s, std::uint8_t c[3])
 	{
+		// [修复 C8] 用优选的 'C' locale 流解析，避免受全局 locale 小数点影响。
+		auto ss = LocaleFreeStream(s);
 		float x, y, z, r, g, b;
-		if (std::sscanf(s.c_str(), "%f %f %f %f %f %f", &x, &y, &z, &r, &g, &b) != 6)
+		if (!(ss >> x >> y >> z >> r >> g >> b))
 			return false;
 		auto to8 = [](float v) -> std::uint8_t {
 			if (v <= 1.0f)
@@ -41,6 +54,115 @@ namespace
 		c[1] = to8(g);
 		c[2] = to8(b);
 		return true;
+	}
+
+	// [修复 C7] 对任意凸/凹多边形做耳切法三角剖分（替代对凹多边形失效的 fan 剖分）。
+	// 思路：用 Newell 法向选主轴把多边形投影到 2D，规整为 CCW 后反复剪"耳"。
+	// 所有三角形以原始顶点索引写回；成功返回 true 并把结果追加到 out。
+	// 退化（重复点/共线导致无法继续剪耳）返回 false，由调用方回退 fan，保证旧行为不回归。
+	bool TriangulatePolygon(const std::vector<float>& P, const std::vector<int>& idx,
+		std::vector<ObjFace>& out)
+	{
+		const int n = (int)idx.size();
+		if (n < 3) return false;
+		if (n == 3)
+		{
+			out.push_back(ObjFace{ idx[0], idx[1], idx[2] });
+			return true;
+		}
+
+		// 1) Newell 法向 → 丢弃最大分量所在轴，得到非退化的 2D 投影
+		float nx = 0, ny = 0, nz = 0;
+		for (int i = 0; i < n; ++i)
+		{
+			int j = (i + 1) % n;
+			const float* a = &P[idx[i] * 3];
+			const float* b = &P[idx[j] * 3];
+			nx += (a[1] - b[1]) * (a[2] + b[2]);
+			ny += (a[2] - b[2]) * (a[0] + b[0]);
+			nz += (a[0] - b[0]) * (a[1] + b[1]);
+		}
+		bool dropX = (std::fabs(nx) >= std::fabs(ny) && std::fabs(nx) >= std::fabs(nz));
+		bool dropY = (!dropX && std::fabs(ny) >= std::fabs(nz));
+
+		std::vector<int> ring = idx;                 // 顶点在环中的槽位
+		std::vector<float> u(n), v(n);
+		for (int i = 0; i < n; ++i)
+		{
+			const float* p = &P[ring[i] * 3];
+			if (dropX)      { u[i] = p[1]; v[i] = p[2]; }
+			else if (dropY) { u[i] = p[0]; v[i] = p[2]; }
+			else            { u[i] = p[0]; v[i] = p[1]; }
+		}
+
+		// 符号面积 -> 负则反向，确保投影后为 CCW（对耳切与包含测试表征一致即可）
+		double area2 = 0;
+		for (int i = 0; i < n; ++i)
+		{
+			int j = (i + 1) % n;
+			area2 += (double)u[i] * v[j] - (double)u[j] * v[i];
+		}
+		if (area2 < 0)
+		{
+			std::reverse(ring.begin(), ring.end());
+			std::reverse(u.begin(), u.end());
+			std::reverse(v.begin(), v.end());
+		}
+
+		auto cross2 = [&](int a, int b, int c) -> double {
+			return (double)(u[b] - u[a]) * (v[c] - v[a])
+				- (double)(v[b] - v[a]) * (u[c] - u[a]);
+		};
+		auto insideTri = [&](int a, int b, int c, int p) -> bool {
+			const double eps = 1e-9;
+			return cross2(a, b, p) >= -eps && cross2(b, c, p) >= -eps && cross2(c, a, p) >= -eps;
+		};
+
+		// 2) 耳切：反复寻找"凸 + 内部无其它点"的顶点并剪下
+		std::vector<bool> removed(n, false);
+		int remaining = n;
+		int guard = n * n + 8;   // 防御性上限，防病态输入死循环
+		while (remaining > 3 && guard-- > 0)
+		{
+			bool clipped = false;
+			for (int i = 0; i < n; ++i)
+			{
+				if (removed[i]) continue;
+				int prev = i; do { prev = (prev + n - 1) % n; } while (removed[prev]);
+				int next = i; do { next = (next + 1) % n; } while (removed[next]);
+				if (prev == next) continue;
+
+				const double c = cross2(prev, i, next);
+				if (c < 1e-9) continue;              // 凹或共线，非耳
+
+				bool hasPt = false;
+				for (int k = 0; k < n; ++k)
+				{
+					if (k == i || k == prev || k == next || removed[k]) continue;
+					if (insideTri(prev, i, next, k)) { hasPt = true; break; }
+				}
+				if (hasPt) continue;
+
+				out.push_back(ObjFace{ ring[prev], ring[i], ring[next] });
+				removed[i] = true;
+				--remaining;
+				clipped = true;
+			}
+			if (!clipped) break;   // 无法继续，判定退化
+		}
+
+		if (remaining == 3)
+		{
+			int a = -1, b = -1, c = -1;
+			for (int i = 0; i < n; ++i)
+			{
+				if (removed[i]) continue;
+				if (a < 0) a = i; else if (b < 0) b = i; else { c = i; break; }
+			}
+			out.push_back(ObjFace{ ring[a], ring[b], ring[c] });
+			return true;
+		}
+		return false;
 	}
 }
 
@@ -71,8 +193,10 @@ bool ObjLoader::Load(const std::string& text, ObjMesh& out)
 
 		if (kw == "v")
 		{
+			// [修复 C8] 顶点坐标解析改用 'C' locale 流（替代 std::sscanf）。
+			auto ss = LocaleFreeStream(line.substr(j));
 			float x, y, z;
-			if (std::sscanf(line.c_str() + j, "%f %f %f", &x, &y, &z) != 3)
+			if (!(ss >> x >> y >> z))
 				continue;
 			out.positions.push_back(x);
 			out.positions.push_back(y);
@@ -99,14 +223,22 @@ bool ObjLoader::Load(const std::string& text, ObjMesh& out)
 				if (vi >= 0)
 					idx.push_back(vi);
 			}
-			// 三角剖分：fan
-			for (size_t k = 1; k + 1 < idx.size(); ++k)
+			// [修复 C7] 三角剖分：优先耳切法（支持凹多边形）；退化面回退 fan，保持兼容。
+			if (idx.size() >= 3)
 			{
-				ObjFace f;
-				f.v0 = idx[0];
-				f.v1 = idx[k];
-				f.v2 = idx[k + 1];
-				out.faces.push_back(f);
+				size_t before = out.faces.size();
+				if (!TriangulatePolygon(out.positions, idx, out.faces))
+				{
+					out.faces.resize(before);   // 丢弃耳切法的部分结果，回退 fan
+					for (size_t k = 1; k + 1 < idx.size(); ++k)
+					{
+						ObjFace f;
+						f.v0 = idx[0];
+						f.v1 = idx[k];
+						f.v2 = idx[k + 1];
+						out.faces.push_back(f);
+					}
+				}
 			}
 		}
 		// 其余关键字（vn/vt/o/g/usemtl/mtllib/s 等）忽略

@@ -191,8 +191,11 @@ namespace
 		const std::uint8_t* ca = &C[f.v0 * 3];
 		const std::uint8_t* cb = &C[f.v1 * 3];
 		const std::uint8_t* cc = &C[f.v2 * 3];
+		// [修复 C1] 重心插值顶点色修正：
+		//   v0 = C-A、v1 = B-A，故 vv 是顶点 C 的权重、ww 是顶点 B 的权重、uu 是顶点 A 的权重。
+		//   因此 B、C 的颜色应分别乘其权重 ww、vv（原实现把 cb/cc 与权重张冠李戴，导致颜色互换）。
 		for (int k = 0; k < 3; ++k)
-			out[k] = (std::uint8_t)(uu * ca[k] + vv * cb[k] + ww * cc[k] + 0.5f);
+			out[k] = (std::uint8_t)(uu * ca[k] + vv * cc[k] + ww * cb[k] + 0.5f);
 	}
 
 	// 取最近三角形并插值顶点色（空间网格加速）

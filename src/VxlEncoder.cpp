@@ -107,6 +107,9 @@ namespace
 					while (i + (size_t)count < voxels.size() &&
 						voxels[i + (size_t)count].z == voxels[i].z + count)
 						++count;
+					// [建议/C12] count 写成 1 字节 (uint8_t)，依赖 sizeZ<=255 的上限才不溢出（单列最大
+					//   连续 run ≤ sizeZ）。此不变量在 Encode 开头校验了 sizeZ<=255，安全；
+					//   但 skip/count 的 255 上限与 bodySize 用 32 位累加都应视为隐性约束，建议在此注释固化。
 
 					body.spanData.push_back((std::uint8_t)skip);
 					body.spanData.push_back((std::uint8_t)count);
@@ -140,9 +143,10 @@ namespace
 
 bool VxlEncoder::Encode(const std::vector<VxlSection>& sections,
 	const std::vector<std::uint8_t>& palette,
-	[[maybe_unused]] const std::string& fileName,
 	std::vector<std::uint8_t>& out_data)
 {
+	// [修复 C2] 删除原 fileName 死参数。VXL 头的前 16 字节是固定的文件类型标识
+	//   "Voxel Animation"，并不存在"写入文件名"的字段；原参数从未被使用、具误导性。
 	out_data.clear();
 
 	if (sections.empty() || sections.size() > 64)

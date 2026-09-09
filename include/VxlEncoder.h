@@ -30,11 +30,11 @@ public:
 	// 将 sections 编码为 VXL 二进制数据。
 	//   sections : 一个或多个 section（每 section 需有 sizeX/Y/Z、spans、normalsMode）
 	//   palette  : 768 字节 RGB 调色板（256 色）
-	//   fileName : 写入文件头（最长 16 字符，超长截断，不足补 0）
 	//   out_data : 输出的 VXL 二进制
 	// 返回是否成功。失败时 out_data 清空。
+	// 注意：VXL 头的前 16 字节是固定的文件类型标识 "Voxel Animation"，
+	//   不存在"文件名"字段（[修复 C2] 已删除原误导性的 fileName 参数）。
 	static bool Encode(const std::vector<VxlSection>& sections,
 		const std::vector<std::uint8_t>& palette,
-		const std::string& fileName,
 		std::vector<std::uint8_t>& out_data);
 };

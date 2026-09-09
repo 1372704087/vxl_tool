@@ -21,8 +21,11 @@ bool VxlDecoder::Decode(const std::uint8_t* data, int size, std::vector<VxlSecti
 	out_sections.clear();
 	out_voxelCount = 0;
 
-	if (data == nullptr || size < 32)
+	if (data == nullptr || size < 802)
 		return false;
+	// [修复 C10] 固定头总长 802 字节（含 768 调色板），最小合法文件也必然 >= 802。
+	//   原先仅校验 size>=32，在 32<=size<802 时会靠后面逐条尾检兜底，路径冗长且让
+	//   bodySize(经 int 转换)出现负值/超大值等不确定分支。此处提前拦截，语义更清晰。
 
 	// ---- VxlHeader (32 字节) ----
 	int pos = 0;
@@ -122,9 +125,14 @@ bool VxlDecoder::Decode(const std::uint8_t* data, int size, std::vector<VxlSecti
 		int dataBase = bodyStart + t.dataSpanOffset;
 
 		if (startBase < 0 || startBase + spanTableBytes > size ||
-			endBase < 0 || endBase + spanTableBytes > size ||
-			dataBase < 0 || dataBase > size)
-			continue;
+		endBase < 0 || endBase + spanTableBytes > size ||
+		dataBase < 0 || dataBase > size)
+		{
+			// [修复 C6] 越界说明 section 头/tailer 与文件体不一致（文件已损坏），
+			//   原实现 continue 会"少读部分体素接着返回 true"，导致上层把损坏数据当成功产物。
+			//   此处改为 return false，让 verify/render 明确报告解析失败。
+			return false;
+		}
 
 		// 读取起始/结束 span 偏移表
 		std::vector<std::int32_t> starts(t.sizeX * t.sizeY);

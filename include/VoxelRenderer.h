@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <vector>
 
+#include <Vxl2.h>
 #include <VxlTypes.h>
+#include <VxlDecoder.h>
 
 struct RenderOptions
 {
@@ -33,6 +35,12 @@ public:
 		const std::vector<std::uint8_t>& palette,
 		const std::vector<float>& hvaTransforms,
 		int hvaSectionCount, int frame,
+		const RenderOptions& opt,
+		std::vector<std::uint8_t>& out_rgba);
+
+	// 渲染 vxl2 格式（RGBA 直存，支持 alpha 混合）
+	static bool RenderVxl2(const std::vector<VxlSection2>& sections,
+		const VxlGlobal2* global,
 		const RenderOptions& opt,
 		std::vector<std::uint8_t>& out_rgba);
 };

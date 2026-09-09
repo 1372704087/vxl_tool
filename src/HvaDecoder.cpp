@@ -59,6 +59,10 @@ bool HvaDecoder::Decode(const std::uint8_t* data, int size,
 	int needBytes = matrixCount * 48;
 	if (pos + needBytes > size)
 		return false;
+	// [建议/C11] 此处先做了 needBytes 的 size 校验，恶意大 header 会在 reserve 前被拦截，安全。
+	//   但值得注意的是最大合法 matrixCount = 65536×512 = 33M，needBytes≈1.6GB，
+	//   out_transforms.reserve 需要 12×33M×4≈1.6GB 浮点内存，接近 32 位进程上限。
+	//   若项目可能运行在 32 位/低内存设备，建议按实际文件 size 放宽上限或分块处理。
 
 	out_transforms.reserve(matrixCount * 12);
 	for (int i = 0; i < matrixCount; ++i)
